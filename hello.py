@@ -30,15 +30,25 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
-
+import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.lab.sim import SimulationCfg, SimulationContext
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+from omni.isaac.lab.assets import Articulation
 import omni.isaac.lab.sim as sim_utils
+from jetbot import JETBOT_CFG 
 
 def design_scene():
     print("NUCLEUS DIR" + ISAAC_NUCLEUS_DIR)
     cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd")
     cfg.func("/World/Objects/Room", cfg, translation=(0.0, 0.0, 0))
+
+    # load the robot
+    prim_utils.create_prim("/World/Origin", "Xform", translation=[0.0, 0.0, 0.0])
+
+    jetbot_cfg = JETBOT_CFG.copy()
+    jetbot_cfg.prim_path = "/World/Origin/Robot"
+    jetbot = Articulation(cfg=jetbot_cfg)
+
 
 def main():
     """Main function."""
