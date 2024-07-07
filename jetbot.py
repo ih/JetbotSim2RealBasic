@@ -9,7 +9,13 @@ JETBOT_CFG = ArticulationCfg(
         usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Jetbot/jetbot.usd"
     ),
     actuators={
-        "all_joints": ImplicitActuatorCfg(joint_names_expr=[".*"])
+        "all_joints": ImplicitActuatorCfg(
+            joint_names_expr=[".*"],
+            effort_limit=None,
+            velocity_limit=None,
+            stiffness=None,
+            damping=None,
+        ),
     }
 )
 

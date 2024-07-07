@@ -30,12 +30,14 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
+import torch
 import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.lab.sim import SimulationCfg, SimulationContext
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.assets import Articulation
 import omni.isaac.lab.sim as sim_utils
 from jetbot import JETBOT_CFG 
+import pdb
 
 def design_scene():
     print("NUCLEUS DIR" + ISAAC_NUCLEUS_DIR)
@@ -48,7 +50,29 @@ def design_scene():
     jetbot_cfg = JETBOT_CFG.copy()
     jetbot_cfg.prim_path = "/World/Origin/Robot"
     jetbot = Articulation(cfg=jetbot_cfg)
+    return {"jetbot": jetbot} 
 
+def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation]):
+    robot = entities["jetbot"]
+    sim_dt = sim.get_physics_dt()
+    count = 0
+    # Simulate physics
+    while simulation_app.is_running():
+        if count % 500 == 0:
+            count = 0
+            joint_pos, joint_vel = robot.data.default_joint_pos.clone(), robot.data.default_joint_vel.clone()
+            joint_pos += torch.rand_like(joint_pos) * .1
+            robot.write_joint_state_to_sim(joint_pos, joint_vel)
+
+            robot.reset()
+            print("[INFO]: Resetting robot state...")
+        efforts = torch.randn_like(robot.data.joint_pos) * 5.0
+        robot.set_joint_effort_target(efforts)
+        robot.write_data_to_sim()
+        # perform step
+        sim.step()
+        count +=1
+        robot.update(sim_dt)
 
 def main():
     """Main function."""
@@ -59,16 +83,14 @@ def main():
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
 
     # Scene Design
-    design_scene()
+    scene_entities = design_scene()
     # Play the simulator
     sim.reset()
     # Now we are ready!
     print("[INFO]: Setup complete...")
+    # pdb.set_trace()
+    run_simulator(sim, scene_entities)
 
-    # Simulate physics
-    while simulation_app.is_running():
-        # perform step
-        sim.step()
 
 
 if __name__ == "__main__":
