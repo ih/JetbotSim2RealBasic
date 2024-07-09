@@ -21,6 +21,7 @@ from omni.isaac.lab.app import AppLauncher
 
 # create argparser
 parser = argparse.ArgumentParser(description="Tutorial on creating an empty stage.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -33,27 +34,23 @@ simulation_app = app_launcher.app
 import torch
 import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.lab.sim import SimulationCfg, SimulationContext
+from omni.isaac.lab.scene import InteractiveScene, InteractiveSceneCfg
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
-from omni.isaac.lab.assets import Articulation
+from omni.isaac.lab.utils import configclass
+from omni.isaac.lab.assets import ArticulationCfg, Articulation, AssetBaseCfg
 import omni.isaac.lab.sim as sim_utils
 from jetbot import JETBOT_CFG 
 import pdb
 
-def design_scene():
-    print("NUCLEUS DIR" + ISAAC_NUCLEUS_DIR)
-    cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd")
-    cfg.func("/World/Objects/Room", cfg, translation=(0.0, 0.0, 0))
 
-    # load the robot
-    prim_utils.create_prim("/World/Origin", "Xform", translation=[0.0, 0.0, 0.0])
+@configclass
+class JetbotSceneCfg(InteractiveSceneCfg):
+    room_cfg = AssetBaseCfg(prim_path="/World/room", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd"))
+    
+    jetbot: ArticulationCfg = JETBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-    jetbot_cfg = JETBOT_CFG.copy()
-    jetbot_cfg.prim_path = "/World/Origin/Robot"
-    jetbot = Articulation(cfg=jetbot_cfg)
-    return {"jetbot": jetbot} 
-
-def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation]):
-    robot = entities["jetbot"]
+def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
+    robot = scene["jetbot"]
     sim_dt = sim.get_physics_dt()
     count = 0
     # Simulate physics
@@ -64,15 +61,15 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             joint_pos += torch.rand_like(joint_pos) * .1
             robot.write_joint_state_to_sim(joint_pos, joint_vel)
 
-            robot.reset()
+            scene.reset()
             print("[INFO]: Resetting robot state...")
         efforts = torch.randn_like(robot.data.joint_pos) * 5.0
         robot.set_joint_effort_target(efforts)
-        robot.write_data_to_sim()
+        scene.write_data_to_sim()
         # perform step
         sim.step()
         count +=1
-        robot.update(sim_dt)
+        scene.update(sim_dt)
 
 def main():
     """Main function."""
@@ -83,13 +80,13 @@ def main():
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
 
     # Scene Design
-    scene_entities = design_scene()
-    # Play the simulator
+    scene_cfg = JetbotSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
+    scene = InteractiveScene(scene_cfg)    # Play the simulator
     sim.reset()
     # Now we are ready!
     print("[INFO]: Setup complete...")
     # pdb.set_trace()
-    run_simulator(sim, scene_entities)
+    run_simulator(sim, scene)
 
 
 
