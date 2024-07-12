@@ -39,6 +39,7 @@ from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.assets import ArticulationCfg, Articulation, AssetBaseCfg
 import omni.isaac.lab.sim as sim_utils
+from omni.isaac.lab.sensors import CameraCfg
 from jetbot import JETBOT_CFG 
 import pdb
 
@@ -48,6 +49,14 @@ class JetbotSceneCfg(InteractiveSceneCfg):
     room_cfg = AssetBaseCfg(prim_path="/World/room", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd"))
     
     jetbot: ArticulationCfg = JETBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+    camera = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/chassis/rgb_camera/jetbot_camera",
+        spawn=None,
+        height=224,
+        width=224,
+        update_period=.1
+    )
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     robot = scene["jetbot"]
@@ -70,6 +79,11 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         sim.step()
         count +=1
         scene.update(sim_dt)
+        print("-------------------------------")
+        print(scene["camera"])
+        print("Received shape of rgb   image: ", scene["camera"].data.output["rgb"].shape)
+        print(scene["camera"].data.output["rgb"])
+        print("-------------------------------")
 
 def main():
     """Main function."""
