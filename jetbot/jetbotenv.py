@@ -105,18 +105,11 @@ class JetbotEnv(DirectRLEnv):
 
 
     def _get_rewards(self) -> torch.Tensor:
-        return torch.tensor([1])
+        return torch.ones(self.num_envs)
     
     def _get_observations(self) -> dict:
         observations =  self.robot_camera.data.output["rgb"].clone()
-        print("----Observation----")
-        print(observations)
         return {"policy": observations}
-
-        obs = self.scene
-        observations = {"policy": obs}
-        return observations
-
 
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
@@ -127,70 +120,10 @@ class JetbotEnv(DirectRLEnv):
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         time_out = self.episode_length_buf >= self.max_episode_length - 1
-        return (torch.tensor([False, time_out]))
+        return (torch.full((self.num_envs,) , False, device='cuda'), time_out)
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         if env_ids is None:
             env_ids = self.robot._ALL_INDICES
         super()._reset_idx(env_ids)
 
-
-
-
-
-# def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
-#     robot = scene["jetbot"]
-#     sim_dt = sim.get_physics_dt()
-#     count = 0
-#     # Simulate physics
-#     while simulation_app.is_running():
-#         if count % 500 == 0:
-#             count = 0
-#             joint_pos, joint_vel = robot.data.default_joint_pos.clone(), robot.data.default_joint_vel.clone()
-#             joint_pos += torch.rand_like(joint_pos) * .1
-#             joint_vel = 5
-#             robot.write_joint_state_to_sim(joint_pos, joint_vel)
-
-#             scene.reset()
-#             print("[INFO]: Resetting robot state...")
-#         # efforts = torch.randn_like(robot.data.joint_pos) * 5.0
-#         # efforts = robot.data.joint_vel + 10 
-#         # print(efforts)
-
-#         # robot.set_joint_effort_target(efforts)
-#         robot.set_joint_velocity_target(torch.tensor([[100.0, 100.0]]))
-#         scene.write_data_to_sim()
-#         # perform step
-#         sim.step()
-#         count +=1
-#         scene.update(sim_dt)
-#         # print("-------------------------------")
-#         # print(scene["camera"])
-#         # print("Received shape of rgb   image: ", scene["camera"].data.output["rgb"].shape)
-#         # print(scene["camera"].data.output["rgb"])
-#         # print("-------------------------------")
-
-# def main():
-#     """Main function."""
-#     # Initialize the simulation context
-#     sim_cfg = SimulationCfg(dt=0.01)
-#     sim = SimulationContext(sim_cfg)
-#     # Set main camera
-#     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
-
-#     # Scene Design
-#     scene_cfg = JetbotSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
-#     scene = InteractiveScene(scene_cfg)    # Play the simulator
-#     sim.reset()
-#     # Now we are ready!
-#     print("[INFO]: Setup complete...")
-#     # pdb.set_trace()
-#     run_simulator(sim, scene)
-
-
-
-# if __name__ == "__main__":
-#     # run the main function
-#     main()
-#     # close sim app
-#     simulation_app.close()
