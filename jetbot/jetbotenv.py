@@ -50,7 +50,7 @@ import pdb
 
 @configclass
 class JetbotSceneCfg(InteractiveSceneCfg):
-    room_cfg = AssetBaseCfg(prim_path="/World/room", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd"))
+    room_cfg = AssetBaseCfg(prim_path="{ENV_REGEX_NS}/room", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd"))
     
     jetbot: ArticulationCfg = JETBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
@@ -70,7 +70,7 @@ class JetbotEnvCfg(DirectRLEnvCfg):
     action_scale = 100.0
 
     # Scene
-    scene: InteractiveSceneCfg = JetbotSceneCfg(num_envs=1, env_spacing=2.0)
+    scene: InteractiveSceneCfg = JetbotSceneCfg(num_envs=1, env_spacing=15.0)
 
     num_channels = 3
     num_observations = num_channels * scene.camera.height * scene.camera.width
