@@ -55,11 +55,11 @@ class JetbotSceneCfg(InteractiveSceneCfg):
     jetbot: ArticulationCfg = JETBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     camera = CameraCfg(
+        data_types=["rgb"],
         prim_path="{ENV_REGEX_NS}/Robot/chassis/rgb_camera/jetbot_camera",
         spawn=None,
         height=224,
         width=224,
-        update_period=.1
     )
 
 @configclass 
@@ -109,6 +109,8 @@ class JetbotEnv(DirectRLEnv):
     
     def _get_observations(self) -> dict:
         observations =  self.robot_camera.data.output["rgb"].clone()
+        # get rid of the alpha channel
+        observations = observations[:, :, :, :3]
         return {"policy": observations}
 
 
