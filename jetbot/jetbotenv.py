@@ -15,21 +15,6 @@
 """Launch Isaac Sim Simulator first."""
 
 
-# import argparse
-
-# from omni.isaac.lab.app import AppLauncher
-
-# # create argparser
-# parser = argparse.ArgumentParser(description="Tutorial on creating an empty stage.")
-# parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
-# # append AppLauncher cli args
-# AppLauncher.add_app_launcher_args(parser)
-# # parse the arguments
-# args_cli = parser.parse_args()
-# # launch omniverse app
-# app_launcher = AppLauncher(args_cli)
-# simulation_app = app_launcher.app
-
 """Rest everything follows."""
 from collections.abc import Sequence
 import torch
@@ -37,11 +22,12 @@ import gymnasium as gym
 import numpy as np
 from omni.isaac.lab.envs import DirectRLEnv, DirectRLEnvCfg
 import omni.isaac.core.utils.prims as prim_utils
+from omni.isaac.utils._isaac_utils.math import get_basis_vector_z
 from omni.isaac.lab.sim import SimulationCfg, SimulationContext
 from omni.isaac.lab.scene import InteractiveScene, InteractiveSceneCfg
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.assets import ArticulationCfg, Articulation, AssetBaseCfg
+from omni.isaac.lab.assets import ArticulationCfg, Articulation, AssetBaseCfg 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.sensors import CameraCfg
 from .jetbot import JETBOT_CFG 
@@ -60,7 +46,10 @@ class JetbotSceneCfg(InteractiveSceneCfg):
         spawn=None,
         height=224,
         width=224,
+        update_period=.1
     )
+
+    goal_marker = AssetBaseCfg(prim_path="{ENV_REGEX_NS}/marker", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/red_block.usd"), init_state=AssetBaseCfg.InitialStateCfg(pos=(.3,0,0)))
 
 @configclass 
 class JetbotEnvCfg(DirectRLEnvCfg):
@@ -81,8 +70,21 @@ class JetbotEnv(DirectRLEnv):
     def __init__(self, cfg: JetbotEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
         self.robot = self.scene["jetbot"]
+        # self._set_goal_position() 
         self.robot_camera = self.scene["camera"]
         self.action_scale = self.cfg.action_scale
+
+    def _set_goal_position(self):
+        robot_orientation = self.robot.data.root_quat_w
+        marker = self.scene["goal_marker"]
+        # forward_vector = get_basis_vector_z(robot_orientation)
+        positions, orientations = marker.get_world_poses()
+        positions[:, 2] += 1.5
+        marker.set_world_poses(positions, orientations) 
+        forward_distance = 1
+        # point_in_front = self.robot.data.root_pow_w + forward_distance * forward_vector
+
+        return
 
     def _configure_gym_env_spaces(self):
         self.num_actions = self.cfg.num_actions
