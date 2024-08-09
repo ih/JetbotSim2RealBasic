@@ -73,6 +73,7 @@ class JetbotEnv(DirectRLEnv):
         # self._set_goal_position() 
         self.robot_camera = self.scene["camera"]
         self.action_scale = self.cfg.action_scale
+        self.goal_marker = self.scene["goal_marker"]
 
     def _set_goal_position(self):
         robot_orientation = self.robot.data.root_quat_w
@@ -107,8 +108,13 @@ class JetbotEnv(DirectRLEnv):
 
 
     def _get_rewards(self) -> torch.Tensor:
-        return torch.ones(self.num_envs)
-    
+        robot_position = self.robot.data.root_pos_w
+        goal_position, goal_orientation = self.goal_marker.get_world_poses()
+        squared_diffs = (robot_position - goal_position) ** 2
+        distance_to_goal = torch.sqrt(torch.sum(squared_diffs, dim=-1))
+        rewards = 1/(distance_to_goal)
+        return rewards
+
     def _get_observations(self) -> dict:
         observations =  self.robot_camera.data.output["rgb"].clone()
         # get rid of the alpha channel
@@ -123,11 +129,25 @@ class JetbotEnv(DirectRLEnv):
         self.robot.set_joint_velocity_target(self.actions)
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
+        epsilon = .01
         time_out = self.episode_length_buf >= self.max_episode_length - 1
-        return (torch.full((self.num_envs,) , False, device='cuda'), time_out)
+        robot_position = self.robot.data.root_pos_w
+        goal_position, goal_orientation = self.goal_marker.get_world_poses()
+        squared_diffs = (robot_position - goal_position) ** 2
+        distance_to_goal = torch.sqrt(torch.sum(squared_diffs, dim=-1))
+        distance_within_epsilon = distance_to_goal < epsilon
+        distance_over_limit = distance_to_goal > .31
+        return (torch.logical_or(distance_within_epsilon, distance_over_limit), time_out)
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         if env_ids is None:
             env_ids = self.robot._ALL_INDICES
         super()._reset_idx(env_ids)
+        joint_pos = self.robot.data.default_joint_pos[env_ids]
+        joint_vel = self.robot.data.default_joint_vel[env_ids]
+        default_root_state = self.robot.data.default_root_state[env_ids]
+        default_root_state[:, :3] += self.scene.env_origins[env_ids]
+        self.robot.write_root_pose_to_sim(default_root_state[:, :7], env_ids)
+        self.robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
+        self.robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 

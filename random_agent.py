@@ -59,7 +59,7 @@ def main():
         with torch.inference_mode():
             # sample actions from -1 to 1
             actions = (2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1) * -1
-            actions = torch.tensor([[0,0]], device='cuda:0')
+            # actions = torch.tensor([[0,0]], device='cuda:0')
             # apply actions
             env.step(actions)
 

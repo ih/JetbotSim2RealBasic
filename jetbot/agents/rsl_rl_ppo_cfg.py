@@ -15,7 +15,7 @@ from omni.isaac.lab_tasks.utils.wrappers.rsl_rl import (
 @configclass
 class CartpolePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 16
-    max_iterations = 150
+    max_iterations = 50
     save_interval = 50
     experiment_name = "cartpole_direct"
     empirical_normalization = False
@@ -31,7 +31,7 @@ class CartpolePPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
         entropy_coef=0.005,
         num_learning_epochs=5,
-        num_mini_batches=4,
+        num_mini_batches=40,
         learning_rate=1.0e-3,
         schedule="adaptive",
         gamma=0.99,
