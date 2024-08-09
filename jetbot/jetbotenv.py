@@ -27,7 +27,7 @@ from omni.isaac.lab.sim import SimulationCfg, SimulationContext
 from omni.isaac.lab.scene import InteractiveScene, InteractiveSceneCfg
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.assets import ArticulationCfg, Articulation, AssetBaseCfg 
+from omni.isaac.lab.assets import ArticulationCfg, Articulation, AssetBaseCfg, RigidObjectCfg
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.sensors import CameraCfg
 from .jetbot import JETBOT_CFG 
@@ -49,7 +49,7 @@ class JetbotSceneCfg(InteractiveSceneCfg):
         update_period=.1
     )
 
-    goal_marker = AssetBaseCfg(prim_path="{ENV_REGEX_NS}/marker", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/red_block.usd"), init_state=AssetBaseCfg.InitialStateCfg(pos=(.3,0,0)))
+    goal_marker = RigidObjectCfg(prim_path="{ENV_REGEX_NS}/marker", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/red_block.usd"), init_state=RigidObjectCfg.InitialStateCfg(pos=(.3,0,0)))
 
 @configclass 
 class JetbotEnvCfg(DirectRLEnvCfg):
@@ -109,7 +109,7 @@ class JetbotEnv(DirectRLEnv):
 
     def _get_rewards(self) -> torch.Tensor:
         robot_position = self.robot.data.root_pos_w
-        goal_position, goal_orientation = self.goal_marker.get_world_poses()
+        goal_position = self.goal_marker.data.root_pos_w
         squared_diffs = (robot_position - goal_position) ** 2
         distance_to_goal = torch.sqrt(torch.sum(squared_diffs, dim=-1))
         rewards = 1/(distance_to_goal)
@@ -132,7 +132,7 @@ class JetbotEnv(DirectRLEnv):
         epsilon = .01
         time_out = self.episode_length_buf >= self.max_episode_length - 1
         robot_position = self.robot.data.root_pos_w
-        goal_position, goal_orientation = self.goal_marker.get_world_poses()
+        goal_position = self.goal_marker.data.root_pos_w
         squared_diffs = (robot_position - goal_position) ** 2
         distance_to_goal = torch.sqrt(torch.sum(squared_diffs, dim=-1))
         distance_within_epsilon = distance_to_goal < epsilon
@@ -143,6 +143,9 @@ class JetbotEnv(DirectRLEnv):
         if env_ids is None:
             env_ids = self.robot._ALL_INDICES
         super()._reset_idx(env_ids)
+        default_goal_root_state = self.goal_marker.data.default_root_state[env_ids]
+        default_goal_root_state[:, :3] += self.scene.env_origins[env_ids]
+        self.goal_marker.write_root_pose_to_sim(default_goal_root_state[:, :7], env_ids)
         joint_pos = self.robot.data.default_joint_pos[env_ids]
         joint_vel = self.robot.data.default_joint_vel[env_ids]
         default_root_state = self.robot.data.default_root_state[env_ids]
