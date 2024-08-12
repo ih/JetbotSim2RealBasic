@@ -38,7 +38,7 @@ import pdb
 class JetbotSceneCfg(InteractiveSceneCfg):
     room_cfg = AssetBaseCfg(prim_path="{ENV_REGEX_NS}/room", spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Room/simple_room.usd"))
     
-    jetbot: ArticulationCfg = JETBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    jetbot: ArticulationCfg = JETBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot", init_state=ArticulationCfg.InitialStateCfg(pos=(-.6,0,0)))
 
     camera = CameraCfg(
         data_types=["rgb"],
@@ -97,7 +97,7 @@ class JetbotEnv(DirectRLEnv):
             high=np.inf,
             shape=(self.cfg.scene.camera.height, self.cfg.scene.camera.width, self.cfg.num_channels),
         )
-        self.single_action_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_actions,))
+        self.single_action_space = gym.spaces.Box(low=-1, high=1, shape=(self.num_actions,))
 
         # batch the spaces for vectorized environments
         self.observation_space = gym.vector.utils.batch_space(self.single_observation_space, self.num_envs)
@@ -112,7 +112,11 @@ class JetbotEnv(DirectRLEnv):
         goal_position = self.goal_marker.data.root_pos_w
         squared_diffs = (robot_position - goal_position) ** 2
         distance_to_goal = torch.sqrt(torch.sum(squared_diffs, dim=-1))
-        rewards = 1/(distance_to_goal)
+        rewards = torch.exp(1/(distance_to_goal))
+        rewards -= 30
+
+        if (self.common_step_counter % 10 == 0):
+            print(f"Reward at step {self.common_step_counter} is {rewards} for distance {distance_to_goal}")
         return rewards
 
     def _get_observations(self) -> dict:
@@ -137,7 +141,9 @@ class JetbotEnv(DirectRLEnv):
         distance_to_goal = torch.sqrt(torch.sum(squared_diffs, dim=-1))
         distance_within_epsilon = distance_to_goal < epsilon
         distance_over_limit = distance_to_goal > .31
-        return (torch.logical_or(distance_within_epsilon, distance_over_limit), time_out)
+        position_termination_condition = torch.logical_or(distance_within_epsilon, distance_over_limit)
+        position_termination_condition.fill_(False)
+        return (position_termination_condition, time_out)
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         if env_ids is None:
