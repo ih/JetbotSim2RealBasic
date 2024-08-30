@@ -7,7 +7,7 @@
 
 """Launch Isaac Sim Simulator first."""
 import argparse
-import pdb
+
 from omni.isaac.lab.app import AppLauncher
 
 
@@ -52,6 +52,26 @@ import jetbot
 from omni.isaac.lab_tasks.utils import get_checkpoint_path, load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.rl_games import RlGamesGpuEnv, RlGamesVecEnvWrapper
 
+class ModelWrapper(torch.nn.Module):
+    '''
+    Main idea is to ignore outputs which we don't need from model
+    '''
+    def __init__(self, model):
+        torch.nn.Module.__init__(self)
+        self._model = model
+        
+        
+    def forward(self,input_dict):
+        input_dict['obs'] = self._model.norm_obs(input_dict['obs'])
+        '''
+        just model export doesn't work. Looks like onnx issue with torch distributions
+        thats why we are exporting only neural network
+        '''
+        #print(input_dict)
+        #output_dict = self._model.a2c_network(input_dict)
+        #input_dict['is_train'] = False
+        #return output_dict['logits'], output_dict['values']
+        return self._model.a2c_network(input_dict)
 
 def main():
     """Play with RL-Games agent."""
@@ -109,41 +129,25 @@ def main():
     # obtain the agent from the runner
     agent: BasePlayer = runner.create_player()
     agent.restore(resume_path)
-    agent.reset()
 
-    # reset environment
-    obs = env.reset()
-    if isinstance(obs, dict):
-        obs = obs["obs"]
-    # required: enables the flag for batched observations
-    _ = agent.get_batch_size(obs, 1)
-    # initialize RNN states if used
-    if agent.is_rnn:
-        agent.init_rnn()
-    # simulate environment
-    # note: We simplified the logic in rl-games player.py (:func:`BasePlayer.run()`) function in an
-    #   attempt to have complete control over environment stepping. However, this removes other
-    #   operations such as masking that is used for multi-agent learning by RL-Games.
-    while simulation_app.is_running():
-        # run everything in inference mode
-        with torch.inference_mode():
-            # convert obs to agent format
-            obs = agent.obs_to_torch(obs)
-            # agent stepping
-            pdb.set_trace()
-            actions = agent.get_action(obs, is_deterministic=True)
-            # env stepping
-            obs, _, dones, _ = env.step(actions)
+    import rl_games.algos_torch.flatten as flatten
+    inputs = {
+        'obs' : torch.zeros((1,) + agent.obs_shape).to(agent.device),
+    }
+    
+    with torch.no_grad():
+        adapter = flatten.TracingAdapter(ModelWrapper(agent.model), inputs, allow_non_tensor=True)
+        traced = torch.jit.trace(adapter, adapter.flattened_inputs, check_trace=False)
+        flattened_outputs = traced(*adapter.flattened_inputs)
+        print(flattened_outputs)
 
-            # perform operations for terminated episodes
-            if len(dones) > 0:
-                # reset rnn state for terminated episodes
-                if agent.is_rnn and agent.states is not None:
-                    for s in agent.states:
-                        s[:, dones, :] = 0.0
-
-    # close the simulator
+    torch.onnx.export(traced, *adapter.flattened_inputs, os.path.join(log_root_path, "drl_forward_opset16.onnx"), opset_version=16, input_names=['obs'], output_names=['mu','log_std', 'value'])
     env.close()
+
+    # onnx_model = onnx.load("drl_forward.onnx")
+
+    # Check that the model is well formed
+    # onnx.checker.check_model(onnx_model)
 
 
 if __name__ == "__main__":
@@ -151,3 +155,4 @@ if __name__ == "__main__":
     main()
     # close sim app
     simulation_app.close()
+
