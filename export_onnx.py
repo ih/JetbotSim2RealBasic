@@ -1,6 +1,9 @@
+# Original Code:
 # Copyright (c) 2022-2024, The Isaac Lab Project Developers.
 # All rights reserved.
 #
+# Modifications:
+# Copyright (c) 2024, Irvin Hwang
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Script to play a checkpoint if an RL agent from RL-Games."""
